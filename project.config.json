@@ -10,7 +10,7 @@
 	"compileType": "game",
 	"libVersion": "1.9.94",
 	"appid": "wxc8f3f14d451efbad",
-	"projectname": "MyStory",
+	"projectname": "MyStoryGame",
 	"condition": {
 		"search": {
 			"current": -1,

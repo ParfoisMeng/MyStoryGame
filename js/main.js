@@ -1,178 +1,81 @@
-import Player     from './player/index'
-import Enemy      from './npc/enemy'
-import BackGround from './runtime/background'
-import GameInfo   from './runtime/gameinfo'
-import Music      from './runtime/music'
-import DataBus    from './databus'
-
-let ctx   = canvas.getContext('2d')
-let databus = new DataBus()
+var context = canvas.getContext('2d')
 
 /**
  * 游戏主函数
  */
 export default class Main {
   constructor() {
-    // 维护当前requestAnimationFrame的id
-    this.aniId    = 0
+    var w = canvas.width
+    var h = canvas.height
+    console.log(w + "," + h)
 
-    this.restart()
-  }
+    var bg = wx.createImage()
+    bg.onload = function() {
+      context.drawImage(bg, 0, 0, w, h)
 
-  restart() {
-    databus.reset()
+      var grad = context.createLinearGradient(0, h - 120 - 24, 0, h); //创建一个渐变色线性对象
+      grad.addColorStop(0, "#fff0"); //定义渐变色颜色
+      grad.addColorStop(1, "#ffff");
+      context.fillStyle = grad; //设置fillStyle为当前的渐变对象
+      context.fillRect(0, h * 3 / 4, w, h); //绘制渐变图形
 
-    canvas.removeEventListener(
-      'touchstart',
-      this.touchHandler
-    )
+      context.fillStyle = '#fff9'
+      drawRoundedRect(context, w / 4 + 10, h - 120 - 24, w / 2 - 20, 48, 22, true, false)
+      var text = '开始游戏'
+      context.fillStyle = '#333'
+      context.textAlign = 'center'
+      context.font = '20px Airal'
+      context.fillText(text, w / 2, h - 120 + 5);
 
-    this.bg       = new BackGround(ctx)
-    this.player   = new Player(ctx)
-    this.gameinfo = new GameInfo()
-    this.music    = new Music()
-
-    this.bindLoop     = this.loop.bind(this)
-    this.hasEventBind = false
-
-    // 清除上一局的动画
-    window.cancelAnimationFrame(this.aniId);
-
-    this.aniId = window.requestAnimationFrame(
-      this.bindLoop,
-      canvas
-    )
-  }
-
-  /**
-   * 随着帧数变化的敌机生成逻辑
-   * 帧数取模定义成生成的频率
-   */
-  enemyGenerate() {
-    if ( databus.frame % 30 === 0 ) {
-      let enemy = databus.pool.getItemByClass('enemy', Enemy)
-      enemy.init(6)
-      databus.enemys.push(enemy)
+      var text = '* 请注意，本游戏没有存档功能，程序被杀死将会丢档。'
+      context.fillStyle = '#333'
+      context.textAlign = 'center'
+      context.font = '14px Airal'
+      context.fillText(text, w / 2, h - 60 + 5);
     }
-  }
+    bg.src = 'images\\bg_' + Math.floor(Math.random() * 10 + 1) + '.jpg'
 
-  // 全局碰撞检测
-  collisionDetection() {
-    let that = this
+    wx.onTouchEnd(function(touches) {
+      var x = touches.changedTouches[0].pageX
+      var y = touches.changedTouches[0].pageY
+      console.log(x + "," + y)
 
-    databus.bullets.forEach((bullet) => {
-      for ( let i = 0, il = databus.enemys.length; i < il;i++ ) {
-        let enemy = databus.enemys[i]
-
-        if ( !enemy.isPlaying && enemy.isCollideWith(bullet) ) {
-          enemy.playAnimation()
-          that.music.playExplosion()
-
-          bullet.visible = false
-          databus.score  += 1
-
-          break
-        }
+      if (isInsideRect([x, y], w / 4 + 10, h - 120 - 24, w / 2 - 20, 48)) {
+        wx.showToast({
+          title: '正在载入',
+          icon: 'loading',
+          duration: 1500,
+          mask: true
+        })
+        
       }
     })
-
-    for ( let i = 0, il = databus.enemys.length; i < il;i++ ) {
-      let enemy = databus.enemys[i]
-
-      if ( this.player.isCollideWith(enemy) ) {
-        databus.gameOver = true
-
-        break
-      }
-    }
   }
+}
 
-  // 游戏结束后的触摸事件处理逻辑
-  touchEventHandler(e) {
-     e.preventDefault()
+/**
+ * 是否在某区域内
+ */
+function isInsideRect([locationX, locationY], x, y, w, h) {
+  return (locationX > x && locationX < x + w && locationY > y && locationY < y + h)
+}
 
-    let x = e.touches[0].clientX
-    let y = e.touches[0].clientY
-
-    let area = this.gameinfo.btnArea
-
-    if (   x >= area.startX
-        && x <= area.endX
-        && y >= area.startY
-        && y <= area.endY  )
-      this.restart()
+/**
+ * 画圆角矩形
+ */
+function drawRoundedRect(ctx, x, y, width, height, r, fill, stroke) {
+  ctx.save();
+  ctx.beginPath(); // draw top and top right corner 
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + r, r); // draw right side and bottom right corner 
+  ctx.arcTo(x + width, y + height, x + width - r, y + height, r); // draw bottom and bottom left corner 
+  ctx.arcTo(x, y + height, x, y + height - r, r); // draw left and top left corner 
+  ctx.arcTo(x, y, x + r, y, r);
+  if (fill) {
+    ctx.fill();
   }
-
-  /**
-   * canvas重绘函数
-   * 每一帧重新绘制所有的需要展示的元素
-   */
-  render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-    this.bg.render(ctx)
-
-    databus.bullets
-          .concat(databus.enemys)
-          .forEach((item) => {
-              item.drawToCanvas(ctx)
-            })
-
-    this.player.drawToCanvas(ctx)
-
-    databus.animations.forEach((ani) => {
-      if ( ani.isPlaying ) {
-        ani.aniRender(ctx)
-      }
-    })
-
-    this.gameinfo.renderGameScore(ctx, databus.score)
-
-    // 游戏结束停止帧循环
-    if ( databus.gameOver ) {
-      this.gameinfo.renderGameOver(ctx, databus.score)
-
-      if ( !this.hasEventBind ) {
-        this.hasEventBind = true
-        this.touchHandler = this.touchEventHandler.bind(this)
-        canvas.addEventListener('touchstart', this.touchHandler)
-      }
-    }
+  if (stroke) {
+    ctx.stroke();
   }
-
-  // 游戏逻辑更新主函数
-  update() {
-    if ( databus.gameOver )
-      return;
-
-    this.bg.update()
-
-    databus.bullets
-           .concat(databus.enemys)
-           .forEach((item) => {
-              item.update()
-            })
-
-    this.enemyGenerate()
-
-    this.collisionDetection()
-
-    if ( databus.frame % 20 === 0 ) {
-      this.player.shoot()
-      this.music.playShoot()
-    }
-  }
-
-  // 实现游戏帧循环
-  loop() {
-    databus.frame++
-
-    this.update()
-    this.render()
-
-    this.aniId = window.requestAnimationFrame(
-      this.bindLoop,
-      canvas
-    )
-  }
+  ctx.restore();
 }
